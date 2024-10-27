@@ -59,49 +59,30 @@ def initialize_sensors():
         disable_sensor(ce_pin)
         time.sleep(0.1)  # Delay between sensor initializations
 
-# Function to read data from a sensor with a specific address
-def read_sensor_data(address, register):
-    try:
-        data = bus.read_byte_data(address, register)
-        return data
-    except Exception as e:
-        print(f"Error reading from sensor at address {hex(address)}: {e}")
-        return None
+# Function to scan I2C bus for connected devices
+def scan_i2c_bus():
+    detected_addresses = []
+    print("Scanning I2C bus for devices...")
+    for address in range(128):  # I2C address range from 0x00 to 0x7F
+        try:
+            bus.read_byte(address)
+            detected_addresses.append(hex(address))
+        except:
+            pass  # Ignore errors for addresses with no device
+    return detected_addresses
 
 # Initialize sensors with unique addresses
 initialize_sensors()
 
-# Timing intervals for each sensor
-sensor_intervals = {
-    "sensor_1": 1 / 3,  # 3Hz ~ every 0.33 seconds
-    "sensor_2": 1 / 2,  # 2Hz ~ every 0.5 seconds
-    "sensor_3": 3       # Every 3 seconds
-}
+# Scan the I2C bus and output detected addresses
+detected_addresses = scan_i2c_bus()
+print(f"Detected I2C addresses: {detected_addresses}")
 
-# Track the last read time for each sensor
-last_read_time = {
-    "sensor_1": 0,
-    "sensor_2": 0,
-    "sensor_3": 0
-}
+# If the correct addresses are detected, proceed with reading data
+if all(hex(addr) in detected_addresses for addr in sensor_addresses.values()):
+    print("All sensors initialized successfully with unique addresses.")
+else:
+    print("Some sensors were not detected at the expected addresses.")
 
-# Main loop to read each sensor at its specified interval
-try:
-    while True:
-        current_time = time.time()
-        
-        # Check each sensor's interval and read if enough time has passed
-        for sensor_name, address in sensor_addresses.items():
-            interval = sensor_intervals[sensor_name]
-            if current_time - last_read_time[sensor_name] >= interval:
-                # Read data from the sensor with the unique address
-                sensor_data = read_sensor_data(address, sensor_register)
-                if sensor_data is not None:
-                    print(f"{sensor_name} data: {sensor_data}")
-                
-                # Update last read time for the sensor
-                last_read_time[sensor_name] = current_time
-
-except KeyboardInterrupt:
-    print("Stopping the sensor read operation.")
-    GPIO.cleanup()  # Clean up GPIO settings
+# Main loop to read each sensor at its specified interval (if necessary)
+# Further code can be added here for reading data based on detected addresses
