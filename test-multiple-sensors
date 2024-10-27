@@ -1,0 +1,63 @@
+import smbus
+import time
+import RPi.GPIO as GPIO
+
+# Initialize the I2C bus (bus 1 on Raspberry Pi)
+bus = smbus.SMBus(1)
+
+# Define the I2C address for VL6180X (same for all sensors)
+sensor_address = 0x29
+
+# Define the GPIO pins for each sensor's CE pin
+sensor_ce_pins = {
+    "sensor_1": 17,  # GPIO17 for Sensor 1 CE
+    "sensor_2": 22,  # GPIO22 for Sensor 2 CE
+    "sensor_3": 27   # GPIO27 for Sensor 3 CE
+}
+
+# Setup GPIO
+GPIO.setmode(GPIO.BCM)
+for pin in sensor_ce_pins.values():
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, GPIO.LOW)  # Disable all sensors initially
+
+# Function to read a byte from a sensor
+def read_sensor_data(address, register):
+    try:
+        data = bus.read_byte_data(address, register)
+        return data
+    except Exception as e:
+        print(f"Error reading from sensor at address {hex(address)}: {e}")
+        return None
+
+# Define the register you want to read from (proximity or range register)
+sensor_register = 0x04  # Register for proximity data (depending on the sensor's datasheet)
+
+# Function to enable a specific sensor and disable others
+def enable_sensor(ce_pin):
+    # Disable all sensors first
+    for pin in sensor_ce_pins.values():
+        GPIO.output(pin, GPIO.LOW)
+    # Enable the selected sensor
+    GPIO.output(ce_pin, GPIO.HIGH)
+
+# Main loop to read each sensor's data in sequence
+try:
+    while True:
+        for sensor_name, ce_pin in sensor_ce_pins.items():
+            # Enable the current sensor
+            enable_sensor(ce_pin)
+            time.sleep(0.1)  # Short delay to stabilize
+
+            # Read data from the enabled sensor
+            sensor_data = read_sensor_data(sensor_address, sensor_register)
+            if sensor_data is not None:
+                print(f"{sensor_name} data: {sensor_data}")
+            
+            # Disable the sensor after reading data
+            GPIO.output(ce_pin, GPIO.LOW)
+            time.sleep(1)  # Wait before switching to the next sensor
+
+except KeyboardInterrupt:
+    print("Stopping the sensor read operation.")
+    GPIO.cleanup()  # Clean up GPIO settings
