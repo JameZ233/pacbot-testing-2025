@@ -5,8 +5,15 @@ import RPi.GPIO as GPIO
 # Initialize the I2C bus (bus 1 on Raspberry Pi)
 bus = smbus.SMBus(1)
 
-# Define the I2C address for the VL6180X sensors (all sensors use the same address)
-sensor_address = 0x29
+# Default I2C address of VL6180X sensors
+default_address = 0x29
+
+# New unique addresses for each sensor
+sensor_addresses = {
+    "sensor_1": 0x30,
+    "sensor_2": 0x31,
+    "sensor_3": 0x32
+}
 
 # Define the GPIO pins for each sensor's CE pin
 sensor_ce_pins = {
@@ -15,13 +22,43 @@ sensor_ce_pins = {
     "sensor_3": 27   # GPIO27 for Sensor 3 CE
 }
 
-# Set up GPIO
+# Define the register you want to read from (proximity or range register)
+sensor_register = 0x04  # Register for proximity data
+
+# Setup GPIO
 GPIO.setmode(GPIO.BCM)
 for pin in sensor_ce_pins.values():
     GPIO.setup(pin, GPIO.OUT)
     GPIO.output(pin, GPIO.LOW)  # Disable all sensors initially
 
-# Function to read a byte from a sensor
+# Function to enable a specific sensor
+def enable_sensor(ce_pin):
+    GPIO.output(ce_pin, GPIO.HIGH)
+    time.sleep(0.01)  # Short delay to stabilize (0.01s for faster enable)
+
+# Function to disable a specific sensor
+def disable_sensor(ce_pin):
+    GPIO.output(ce_pin, GPIO.LOW)
+
+# Function to change the I2C address of a sensor
+def change_i2c_address(old_address, new_address):
+    try:
+        # Write new address to I2C address register (usually 0x212)
+        bus.write_byte_data(old_address, 0x212, new_address)
+        print(f"Changed I2C address from {hex(old_address)} to {hex(new_address)}")
+    except Exception as e:
+        print(f"Error changing address from {hex(old_address)} to {hex(new_address)}: {e}")
+
+# Function to initialize sensors with unique addresses
+def initialize_sensors():
+    for sensor_name, new_address in sensor_addresses.items():
+        ce_pin = sensor_ce_pins[sensor_name]
+        enable_sensor(ce_pin)
+        change_i2c_address(default_address, new_address)
+        disable_sensor(ce_pin)
+        time.sleep(0.1)  # Delay between sensor initializations
+
+# Function to read data from a sensor with a specific address
 def read_sensor_data(address, register):
     try:
         data = bus.read_byte_data(address, register)
@@ -30,16 +67,8 @@ def read_sensor_data(address, register):
         print(f"Error reading from sensor at address {hex(address)}: {e}")
         return None
 
-# Define the register you want to read from (proximity or range register)
-sensor_register = 0x04  # Register for proximity data
-
-# Function to enable a specific sensor and disable others
-def enable_sensor(ce_pin):
-    # Disable all sensors first
-    for pin in sensor_ce_pins.values():
-        GPIO.output(pin, GPIO.LOW)
-    # Enable the selected sensor
-    GPIO.output(ce_pin, GPIO.HIGH)
+# Initialize sensors with unique addresses
+initialize_sensors()
 
 # Timing intervals for each sensor
 sensor_intervals = {
@@ -61,23 +90,16 @@ try:
         current_time = time.time()
         
         # Check each sensor's interval and read if enough time has passed
-        for sensor_name, ce_pin in sensor_ce_pins.items():
+        for sensor_name, address in sensor_addresses.items():
             interval = sensor_intervals[sensor_name]
             if current_time - last_read_time[sensor_name] >= interval:
-                # Enable the current sensor
-                enable_sensor(ce_pin)
-                time.sleep(0.1)  # Short delay to stabilize
-
-                # Read data from the enabled sensor
-                sensor_data = read_sensor_data(sensor_address, sensor_register)
+                # Read data from the sensor with the unique address
+                sensor_data = read_sensor_data(address, sensor_register)
                 if sensor_data is not None:
                     print(f"{sensor_name} data: {sensor_data}")
-
+                
                 # Update last read time for the sensor
                 last_read_time[sensor_name] = current_time
-                
-                # Disable the sensor after reading data
-                GPIO.output(ce_pin, GPIO.LOW)
 
 except KeyboardInterrupt:
     print("Stopping the sensor read operation.")
