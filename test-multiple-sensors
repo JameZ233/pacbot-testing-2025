@@ -36,10 +36,6 @@ def enable_sensor(ce_pin):
     GPIO.output(ce_pin, GPIO.HIGH)
     time.sleep(0.01)  # Short delay to stabilize
 
-# Function to disable a specific sensor
-def disable_sensor(ce_pin):
-    GPIO.output(ce_pin, GPIO.LOW)
-
 # Function to change the I2C address of a sensor
 def change_i2c_address(old_address, new_address):
     try:
@@ -56,7 +52,7 @@ def initialize_sensors():
         enable_sensor(ce_pin)
         time.sleep(0.1)  # Allow time for sensor to power up
         change_i2c_address(default_address, new_address)
-        disable_sensor(ce_pin)
+        # Leave the sensor enabled so it retains the address
         time.sleep(0.1)  # Delay between sensor initializations
 
 # Function to scan I2C bus for connected devices
