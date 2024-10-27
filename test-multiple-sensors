@@ -34,7 +34,7 @@ for pin in sensor_ce_pins.values():
 # Function to enable a specific sensor
 def enable_sensor(ce_pin):
     GPIO.output(ce_pin, GPIO.HIGH)
-    time.sleep(0.01)  # Short delay to stabilize (0.01s for faster enable)
+    time.sleep(0.01)  # Short delay to stabilize
 
 # Function to disable a specific sensor
 def disable_sensor(ce_pin):
@@ -43,7 +43,7 @@ def disable_sensor(ce_pin):
 # Function to change the I2C address of a sensor
 def change_i2c_address(old_address, new_address):
     try:
-        # Write new address to I2C address register (usually 0x212)
+        # Write new address to I2C address register (sensor-specific, usually 0x212 for VL6180X)
         bus.write_byte_data(old_address, 0x212, new_address)
         print(f"Changed I2C address from {hex(old_address)} to {hex(new_address)}")
     except Exception as e:
@@ -54,6 +54,7 @@ def initialize_sensors():
     for sensor_name, new_address in sensor_addresses.items():
         ce_pin = sensor_ce_pins[sensor_name]
         enable_sensor(ce_pin)
+        time.sleep(0.1)  # Allow time for sensor to power up
         change_i2c_address(default_address, new_address)
         disable_sensor(ce_pin)
         time.sleep(0.1)  # Delay between sensor initializations
